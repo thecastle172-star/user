@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import InstallPrompt from './InstallPrompt'
 import { loadPublicContent } from './lib/contentCache'
 import type { PublicProperty } from './lib/contentCache'
 
@@ -156,6 +157,7 @@ function App() {
       )}
 
       <footer><div className="brand footer-brand"><span className="brand-mark">ق</span><span>القلعة عقارات الدورة</span></div><p>مساحتك الموثوقة للوصول إلى العقار المناسب.</p><small>© 2026 القلعة عقارات الدورة</small></footer>
+      <InstallPrompt />
     </div>
   )
 }
