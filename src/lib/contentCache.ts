@@ -1,4 +1,4 @@
-import { ConvexHttpClient } from 'convex/browser'
+import { ConvexClient } from 'convex/browser'
 import { makeFunctionReference } from 'convex/server'
 
 export type PublicProperty = { _id?: string; id?: number | string; image: string; type: 'للبيع' | 'للإيجار'; title: string; location: string; price: string; beds: number; baths: number; area: number; description: string }
@@ -8,7 +8,6 @@ export type PublicContent = { properties: PublicProperty[]; banners: PublicBanne
 type CachedContent = { savedAt: number; data: PublicContent }
 
 const CACHE_KEY = 'castle-public-content-v1'
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000
 const getPublic = makeFunctionReference<'query', Record<string, never>, PublicContent>('content:getPublic')
 
 export function readCachedContent(): CachedContent | null {
@@ -23,19 +22,25 @@ export function readCachedContent(): CachedContent | null {
   }
 }
 
-export async function loadPublicContent(fallback: PublicContent) {
+export function loadPublicContent(fallback: PublicContent) {
   const cached = readCachedContent()
-  if (cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return { data: cached.data, source: 'cache' as const }
+  return { data: cached?.data ?? fallback, source: cached ? 'cache' as const : 'fallback' as const }
+}
 
+export function subscribeToPublicContent(onContent: (data: PublicContent) => void, onError?: (error: Error) => void) {
   const convexUrl = import.meta.env.VITE_CONVEX_URL
-  if (!convexUrl) return { data: cached?.data ?? fallback, source: cached ? 'stale-cache' as const : 'fallback' as const }
+  if (!convexUrl) return () => undefined
 
-  try {
-    const client = new ConvexHttpClient(convexUrl)
-    const data = await client.query(getPublic, {})
+  const client = new ConvexClient(convexUrl)
+  const unsubscribe = client.onUpdate(getPublic, {}, (data) => {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), data } satisfies CachedContent))
-    return { data, source: 'remote' as const }
-  } catch {
-    return { data: cached?.data ?? fallback, source: cached ? 'stale-cache' as const : 'fallback' as const }
+    onContent(data)
+  }, (error) => {
+    onError?.(error)
+  })
+
+  return () => {
+    unsubscribe()
+    void client.close()
   }
 }

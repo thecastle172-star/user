@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import InstallPrompt from './InstallPrompt'
-import { loadPublicContent } from './lib/contentCache'
+import { loadPublicContent, subscribeToPublicContent } from './lib/contentCache'
 import type { PublicProperty } from './lib/contentCache'
 
 const fallbackBanners = [
@@ -36,13 +36,21 @@ const fallbackProperties: PublicProperty[] = [
 
 const fallbackWhatsappNumber = '9647742280870'
 
-function Icon({ name }: { name: 'pin' | 'bed' | 'bath' | 'area' | 'search' }) {
+function normalizeWhatsappNumber(value: string) {
+  let digits = value.replace(/\D/g, '')
+  if (digits.startsWith('00')) digits = digits.slice(2)
+  if (digits.startsWith('0')) digits = `964${digits.slice(1)}`
+  return digits
+}
+
+function Icon({ name }: { name: 'pin' | 'bed' | 'bath' | 'area' | 'search' | 'whatsapp' }) {
   const paths = {
     pin: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></>,
     bed: <><path d="M3 19v-8m18 8v-5a3 3 0 0 0-3-3H9a3 3 0 0 0-3 3v5m0-8V8a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3M3 17h18"/></>,
     bath: <><path d="M4 12h16v2a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-2Zm2 0V5a2 2 0 0 1 4 0"/><path d="M8 19v2m8-2v2"/></>,
     area: <><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></>,
     search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+    whatsapp: <><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.5L3.5 20.5l1.4-4.3A8.5 8.5 0 1 1 20.5 11.6Z"/><path d="M8.1 7.6c.3-.6.6-.6.9-.6h.4c.2 0 .4.1.5.5l.8 1.8c.1.3.1.5-.1.7l-.6.8c-.2.2-.2.4 0 .7.7 1.2 1.7 2.1 3 2.7.3.2.5.1.7-.1l.8-1c.2-.3.5-.3.7-.2l1.9.9c.3.2.5.3.5.5 0 .2-.1 1.2-.7 1.8-.6.7-1.5 1-2.5.8-1.2-.2-2.8-.8-4.7-2.5-2.2-2-3.5-4.4-3.6-5.7 0-.6.2-1.4.5-1.9.2-.2.3-.3.5-.3Z"/></>,
   }
   return <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>
 }
@@ -59,18 +67,29 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
-    void loadPublicContent({ properties: fallbackProperties, banners: fallbackBanners, whatsapp: '+964 774 228 0870', contentVersion: 0 }).then(({ data, source }) => {
+    const fallback = { properties: fallbackProperties, banners: fallbackBanners, whatsapp: fallbackWhatsappNumber, contentVersion: 0 }
+    const applyContent = (data: typeof fallback, source: string) => {
       if (cancelled) return
       setContentSource(source)
-      if (data.properties.length) setProperties(data.properties)
-      if (data.banners.length) setBanners(data.banners)
-      const normalizedPhone = data.whatsapp.replace(/\D/g, '')
+      setProperties(data.properties)
+      setBanners(data.banners)
+      setActiveBanner(0)
+      const normalizedPhone = normalizeWhatsappNumber(data.whatsapp)
       if (normalizedPhone) setWhatsappNumber(normalizedPhone)
-    })
-    return () => { cancelled = true }
+    }
+
+    const cached = loadPublicContent(fallback)
+    applyContent(cached.data, cached.source)
+    const unsubscribe = subscribeToPublicContent((data) => applyContent(data, 'realtime'), () => setContentSource('stale-cache'))
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
+    if (banners.length <= 1) return
     const timer = window.setInterval(() => {
       setActiveBanner((current) => (current + 1) % banners.length)
     }, 5000)
@@ -104,7 +123,7 @@ function App() {
           <a href="#services">خدماتنا</a>
           <a href="#about">من نحن</a>
         </nav>
-        <a className="contact-button" href={whatsappUrl('مرحبًا، أود التواصل مع القلعة عقارات الدورة')} target="_blank" rel="noreferrer" aria-label="تواصل معنا عبر واتساب على الرقم +964 774 228 0870"><span>واتساب</span><b dir="ltr">+964 774 228 0870</b></a>
+        <a className="contact-button" href={whatsappUrl('مرحبًا، أود التواصل مع القلعة عقارات الدورة')} target="_blank" rel="noreferrer" aria-label="تواصل معنا عبر واتساب"><Icon name="whatsapp"/><span>تواصل عبر واتساب</span></a>
       </header>
 
       <main id="top">
@@ -150,7 +169,7 @@ function App() {
               <div className="modal-title-row"><h2 id="property-dialog-title">{selectedProperty.title}</h2><strong>{selectedProperty.price}</strong></div>
               <div className="modal-features"><span><Icon name="bed" />{selectedProperty.beds} غرف نوم</span><span><Icon name="bath" />{selectedProperty.baths} حمامات</span><span><Icon name="area" />{selectedProperty.area} م²</span></div>
               <p className="modal-description">{selectedProperty.description}</p>
-              <a className="whatsapp-button" href={whatsappUrl(`مرحبًا، أود الاستفسار عن العقار: ${selectedProperty.title}`)} target="_blank" rel="noreferrer"><span aria-hidden="true">◉</span> استفسار عبر واتساب</a>
+              <a className="whatsapp-button" href={whatsappUrl(`مرحبًا، أود الاستفسار عن العقار: ${selectedProperty.title}`)} target="_blank" rel="noreferrer"><Icon name="whatsapp"/> استفسار عبر واتساب</a>
             </div>
           </section>
         </div>
