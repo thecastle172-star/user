@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import { loadPublicContent } from './lib/contentCache'
+import type { PublicProperty } from './lib/contentCache'
 
-const banners = [
+const fallbackBanners = [
   {
     image: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1800&q=88',
     eyebrow: 'فرصة هذا الأسبوع',
@@ -22,7 +24,7 @@ const banners = [
   },
 ]
 
-const properties = [
+const fallbackProperties: PublicProperty[] = [
   { id: 1, image: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1100&q=85', type: 'للبيع', title: 'فيلا عصرية بحديقة خاصة', location: 'بغداد، حي اليرموك', price: '480,000,000 د.ع', beds: 5, baths: 4, area: 420, description: 'فيلا واسعة بتصميم عصري، تضم حديقة خاصة ومساحات داخلية مضيئة وتشطيبات عالية الجودة. تقع في شارع هادئ وقريب من الخدمات الأساسية.' },
   { id: 2, image: 'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1100&q=85', type: 'للإيجار', title: 'شقة مفروشة بإطلالة مفتوحة', location: 'بغداد، الجادرية', price: '1,800,000 د.ع / شهر', beds: 3, baths: 2, area: 185, description: 'شقة مفروشة بالكامل بأثاث أنيق وإطلالة مفتوحة، مناسبة للعائلة وجاهزة للسكن الفوري مع خدمات وصيانة منتظمة.' },
   { id: 3, image: 'https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?auto=format&fit=crop&w=1100&q=85', type: 'للبيع', title: 'منزل هادئ بتصميم أنيق', location: 'بغداد، المنصور', price: '365,000,000 د.ع', beds: 4, baths: 3, area: 310, description: 'منزل عائلي بتوزيع عملي وغرف رحبة، يتميز بموقع قريب من المدارس والأسواق مع مساحة خارجية مناسبة للجلسات.' },
@@ -31,9 +33,7 @@ const properties = [
   { id: 6, image: 'https://images.unsplash.com/photo-1600573472550-8090b5e0745e?auto=format&fit=crop&w=1100&q=85', type: 'للإيجار', title: 'شقة راقية في مجمع سكني', location: 'بغداد، بوابة العراق', price: '1,500,000 د.ع / شهر', beds: 3, baths: 2, area: 170, description: 'شقة راقية داخل مجمع سكني آمن، مع مصعد ومولد وخدمات متكاملة، مناسبة للسكن العائلي طويل الأمد.' },
 ]
 
-const whatsappNumber = '9647742280870'
-const whatsappUrl = (message: string) =>
-  `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+const fallbackWhatsappNumber = '9647742280870'
 
 function Icon({ name }: { name: 'pin' | 'bed' | 'bath' | 'area' | 'search' }) {
   const paths = {
@@ -47,15 +47,34 @@ function Icon({ name }: { name: 'pin' | 'bed' | 'bath' | 'area' | 'search' }) {
 }
 
 function App() {
+  const [banners, setBanners] = useState(fallbackBanners)
+  const [properties, setProperties] = useState<PublicProperty[]>(fallbackProperties)
+  const [whatsappNumber, setWhatsappNumber] = useState(fallbackWhatsappNumber)
+  const [contentSource, setContentSource] = useState('fallback')
   const [activeBanner, setActiveBanner] = useState(0)
-  const [selectedProperty, setSelectedProperty] = useState<(typeof properties)[number] | null>(null)
+  const [selectedProperty, setSelectedProperty] = useState<PublicProperty | null>(null)
+
+  const whatsappUrl = (message: string) => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+
+  useEffect(() => {
+    let cancelled = false
+    void loadPublicContent({ properties: fallbackProperties, banners: fallbackBanners, whatsapp: '+964 774 228 0870', contentVersion: 0 }).then(({ data, source }) => {
+      if (cancelled) return
+      setContentSource(source)
+      if (data.properties.length) setProperties(data.properties)
+      if (data.banners.length) setBanners(data.banners)
+      const normalizedPhone = data.whatsapp.replace(/\D/g, '')
+      if (normalizedPhone) setWhatsappNumber(normalizedPhone)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       setActiveBanner((current) => (current + 1) % banners.length)
     }, 5000)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [banners.length])
 
   useEffect(() => {
     if (!selectedProperty) return
@@ -71,20 +90,20 @@ function App() {
     }
   }, [selectedProperty])
 
-  const openProperty = (property: (typeof properties)[number]) => {
+  const openProperty = (property: PublicProperty) => {
     setSelectedProperty(property)
   }
 
   return (
-    <div className="app" dir="rtl">
+    <div className="app" dir="rtl" data-content-source={contentSource}>
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="قلعة عقارات الدورة - الرئيسية"><span className="brand-mark">ق</span><span>قلعة عقارات الدورة</span></a>
+        <a className="brand" href="#top" aria-label="القلعة عقارات الدورة - الرئيسية"><span className="brand-mark">ق</span><span>القلعة عقارات الدورة</span></a>
         <nav aria-label="التنقل الرئيسي">
           <a className="active" href="#properties">العقارات</a>
           <a href="#services">خدماتنا</a>
           <a href="#about">من نحن</a>
         </nav>
-        <a className="contact-button" href={whatsappUrl('مرحبًا، أود التواصل مع قلعة عقارات الدورة')} target="_blank" rel="noreferrer" aria-label="تواصل معنا عبر واتساب على الرقم +964 774 228 0870"><span>واتساب</span><b dir="ltr">+964 774 228 0870</b></a>
+        <a className="contact-button" href={whatsappUrl('مرحبًا، أود التواصل مع القلعة عقارات الدورة')} target="_blank" rel="noreferrer" aria-label="تواصل معنا عبر واتساب على الرقم +964 774 228 0870"><span>واتساب</span><b dir="ltr">+964 774 228 0870</b></a>
       </header>
 
       <main id="top">
@@ -111,7 +130,7 @@ function App() {
           <div className="section-heading"><div><span>مختاراتنا لك</span><h2>أحدث العقارات</h2></div><button type="button">عرض الكل <b aria-hidden="true">←</b></button></div>
           <div className="property-grid">
             {properties.map((property) => (
-              <button className="property-card" key={property.id} type="button" onClick={() => openProperty(property)} aria-label={`عرض تفاصيل ${property.title}`}>
+              <button className="property-card" key={property._id ?? property.id ?? property.title} type="button" onClick={() => openProperty(property)} aria-label={`عرض تفاصيل ${property.title}`}>
                 <span className="property-image"><img src={property.image} alt={property.title} loading="lazy" /><span>{property.type}</span><i aria-hidden="true">↗</i></span>
                 <span className="property-summary"><small><Icon name="pin" />{property.location}</small><strong>{property.title}</strong><b>{property.price}</b></span>
               </button>
@@ -136,7 +155,7 @@ function App() {
         </div>
       )}
 
-      <footer><div className="brand footer-brand"><span className="brand-mark">ق</span><span>قلعة عقارات الدورة</span></div><p>مساحتك الموثوقة للوصول إلى العقار المناسب.</p><small>© 2026 قلعة عقارات الدورة</small></footer>
+      <footer><div className="brand footer-brand"><span className="brand-mark">ق</span><span>القلعة عقارات الدورة</span></div><p>مساحتك الموثوقة للوصول إلى العقار المناسب.</p><small>© 2026 القلعة عقارات الدورة</small></footer>
     </div>
   )
 }
