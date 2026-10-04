@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;600;700;800&display=swap');
 
+.load-more-properties { display: block; margin: 28px auto 0; padding: 12px 24px; border: 1px solid #174b3e; border-radius: 12px; background: #fff; color: #174b3e; font: inherit; font-weight: 700; cursor: pointer; }
+
 :root { --ink:#17211d; --muted:#6c7772; --paper:#f6f7f4; --surface:#fff; --green:#154f3e; --gold:#c49b58; --line:#e2e7e3; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }

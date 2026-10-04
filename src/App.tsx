@@ -62,6 +62,7 @@ function App() {
   const [contentSource, setContentSource] = useState('fallback')
   const [activeBanner, setActiveBanner] = useState(0)
   const [selectedProperty, setSelectedProperty] = useState<PublicProperty | null>(null)
+  const [visiblePropertyCount, setVisiblePropertyCount] = useState(6)
 
   const whatsappUrl = (message: string) => `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
 
@@ -147,15 +148,16 @@ function App() {
         </section>
 
         <section className="properties-section" id="properties">
-          <div className="section-heading"><div><span>مختاراتنا لك</span><h2>أحدث العقارات</h2></div><button type="button">عرض الكل <b aria-hidden="true">←</b></button></div>
+          <div className="section-heading"><div><span>مختاراتنا لك</span><h2>أحدث العقارات</h2></div></div>
           <div className="property-grid">
-            {properties.map((property) => (
+            {properties.slice(0, visiblePropertyCount).map((property) => (
               <button className="property-card" key={property._id ?? property.id ?? property.title} type="button" onClick={() => openProperty(property)} aria-label={`عرض تفاصيل ${property.title}`}>
                 <span className="property-image"><img src={property.image} alt={property.title} loading="lazy" /><span>{property.type}</span><i aria-hidden="true">↗</i></span>
                 <span className="property-summary"><small><Icon name="pin" />{property.location}</small><strong>{property.title}</strong><b>{property.price}</b></span>
               </button>
             ))}
           </div>
+          {visiblePropertyCount < properties.length && <button className="load-more-properties" type="button" onClick={() => setVisiblePropertyCount((count) => count + 6)}>عرض المزيد من العقارات <b aria-hidden="true">←</b></button>}
         </section>
       </main>
 
